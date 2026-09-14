@@ -36,10 +36,55 @@ class GeminiAstrologyService:
             if response.status_code == 200:
                 data = response.json()
                 text_result = data['candidates'][0]['content']['parts'][0]['text']
+                
+                # Token counting & Alert
+                try:
+                    from app.services.db_service import DBService
+                    usage = data.get("usageMetadata", {})
+                    total_tokens = usage.get("totalTokenCount", 0)
+                    if total_tokens > 0:
+                        new_total = DBService.increment_tokens(total_tokens)
+                        
+                        # Trigger alert if just crossed 20 Million
+                        if new_total > 20000000 and (new_total - total_tokens) <= 20000000:
+                            cls._send_whatsapp_alert(new_total)
+                except Exception as e:
+                    print(f"Token count exception: {e}")
+                    
                 return text_result
         except Exception as e:
             print(f"Gemini API Exception: {e}")
         return None
+
+    @staticmethod
+    def _send_whatsapp_alert(tokens: int):
+        import os
+        import requests
+        
+        # Twilio Credentials
+        account_sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
+        auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+        from_whatsapp = os.environ.get("TWILIO_FROM_NUMBER", "") # દા.ત. "whatsapp:+17372508034"
+        to_whatsapp = os.environ.get("ALERT_PHONE_NUMBER", "")   # દા.ત. "whatsapp:+916355402542"
+        
+        if not account_sid or not auth_token or not from_whatsapp or not to_whatsapp:
+            return
+            
+        text = f"⚠️ *Astrology App Alert*\nTokens used: {tokens}\nYou have crossed the 20 Million token limit!"
+        
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+        
+        payload = {
+            "From": from_whatsapp,
+            "To": to_whatsapp,
+            "Body": text
+        }
+        
+        try:
+            requests.post(url, data=payload, auth=(account_sid, auth_token), timeout=10)
+        except Exception as e:
+            print(f"Twilio API Exception: {e}")
+
 
     @classmethod
     def analyze_palm(cls, image_bytes: Optional[bytes] = None, lang: str = "gu") -> Dict[str, Any]:

@@ -182,25 +182,25 @@ def get_lat_lon(place: str):
     clean_place = place.split(',')[0].split('(')[0].strip().lower()
     return CITY_COORDS.get(clean_place, ("23.0225", "72.5714")) # Default Ahmedabad
 
-_panchang_cache = {}
-
 @router.get("/panchang/today")
 def get_today_panchang(lang: str = Query("gu"), place: str = Query("Ahmedabad")):
     from app.services.gemini_data_generator import GeminiDataGenerator
     from app.services.panchang_engine import VedicPanchangEngine
+    from app.services.db_service import DBService
     import datetime
     
     today_date = datetime.date.today()
-    cache_key = f"{today_date}_{lang}_{place}"
+    cache_key = f"panchang_{today_date}_{lang}_{place}"
     
-    if cache_key in _panchang_cache:
-        return _panchang_cache[cache_key]
+    cached_data = DBService.get_cache(cache_key)
+    if cached_data and "data" in cached_data:
+        return cached_data["data"]
         
     lat, lon = get_lat_lon(place)
     raw_data = VedicPanchangEngine.calculate_panchang_for_date(today_date, lat, lon)
     panchang_data = GeminiDataGenerator.fetch_panchang(raw_data, lang)
     
-    _panchang_cache[cache_key] = panchang_data
+    DBService.set_cache(cache_key, panchang_data)
     return panchang_data
 
 @router.get("/panchang/date/{date_str}")

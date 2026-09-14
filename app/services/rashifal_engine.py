@@ -25,22 +25,22 @@ class RashifalEngine:
         import datetime
         import random
         
+        from app.services.db_service import DBService
+        
         sign_info = next((s for s in cls.SIGNS if s["id"] == sign_id.lower() or s["en"].lower() == sign_id.lower()), cls.SIGNS[4])
         
-        # Simple daily caching logic
         today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        if cls._cache_date != today_str:
-            cls._cache.clear()
-            cls._cache_date = today_str
-            
-        cache_key = f"{sign_info['id']}_{lang}"
+        cache_key = f"rashifal_{today_str}_{sign_info['id']}_{lang}"
         
-        if cache_key in cls._cache:
-            prediction_text = cls._cache[cache_key]
+        cached_data = DBService.get_cache(cache_key)
+        
+        if cached_data and "data" in cached_data:
+            prediction_text = cached_data["data"]
         else:
             # Get dynamic prediction from Gemini AI
             prediction_text = AIAstrologerService.generate_daily_rashifal(sign_info["en"], lang=lang)
-            cls._cache[cache_key] = prediction_text
+            DBService.set_cache(cache_key, prediction_text)
+
         
         # Make the scores dynamic based on the day and sign so they aren't static
         seed_value = int(datetime.datetime.now().strftime("%Y%m%d")) + sum(ord(c) for c in sign_info["id"])
