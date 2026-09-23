@@ -199,30 +199,92 @@ class AIAstrologerService:
         from PIL import Image
         import io
         
-        palm_type = "Left Palm" if is_left else "Right Palm"
-        prompt = f'''
-        You are an expert Palmist. First, check if the provided image is actually a human palm.
-        If it is NOT a human palm (e.g., a car, animal, random object, or blurry), return this EXACT JSON:
-        {{
-            "general_analysis": "ક્ષમા કરજો, આ ફોટો હથેળીનો લાગતો નથી. કૃપા કરીને સ્પષ્ટ હથેળીનો ફોટો અપલોડ કરો.",
-            "heart_line": "",
-            "head_line": "",
-            "life_line": "",
-            "fate_line": "",
-            "sun_line": "",
-            "special_symbols": ""
-        }}
+        expected_hand = "left" if is_left else "right"
+        expected_hand_title = "Left Palm (ડાબી હથેળી)" if is_left else "Right Palm (જમણી હથેળી)"
         
-        If it IS a human palm, analyze the provided image of a {palm_type}.
-        Provide a detailed reading in {lang} language.
-        Return ONLY a JSON object (do not wrap in markdown or backticks) with exactly these keys:
-        - "general_analysis": A paragraph (4-5 lines) giving an overall summary and future prediction.
-        - "heart_line": Analysis of their emotional life and relationships.
-        - "head_line": Analysis of their intellect and decision making.
-        - "life_line": Analysis of their health, vitality, and longevity.
-        - "fate_line": Analysis of their career and success.
-        - "sun_line": Analysis of their fame and wealth.
-        - "special_symbols": Analysis of any crosses, stars, or special symbols found on the palm.
+        prompt = f'''
+        You are an expert Vedic Palmistry (હસ્તરેખા શાસ્ત્ર) and Computer Vision AI.
+        The user has selected to scan their: {expected_hand_title}.
+
+        STEP 1: INSPECTION & HAND IDENTIFICATION:
+        1. Check if the image clearly shows the inner palmar side of a human hand (open palm with lines).
+           If it is NOT a human palm (e.g. blurry, back of hand/knuckles, face, object, animal, scenery), return:
+           {{
+               "is_valid": false,
+               "error_type": "not_palm",
+               "detected_hand": "unknown",
+               "expected_hand": "{expected_hand}",
+               "general_analysis": "ક્ષમા કરજો, આ ફોટો સ્પષ્ટ હથેળીનો લાગતો નથી. કૃપા કરીને તમારી ખુલ્લી હથેળીનો સ્પષ્ટ ફોટો અપલોડ કરો.",
+               "heart_line": "",
+               "head_line": "",
+               "life_line": "",
+               "fate_line": "",
+               "sun_line": "",
+               "special_symbols": ""
+           }}
+           (Translate general_analysis to {lang} language).
+
+        2. ACCURATE LEFT vs RIGHT PALM IDENTIFICATION:
+           Examine the anatomical features of the palm facing the camera:
+           - In an inner open palm facing the camera:
+             * If the thumb is on the RIGHT side of the image (pointing to the right) and the pinky is on the left, this is a LEFT HAND.
+             * If the thumb is on the LEFT side of the image (pointing to the left) and the pinky is on the right, this is a RIGHT HAND.
+           
+           Determine the detected hand: either "left" or "right".
+           
+           CRITICAL HAND MATCH CHECK:
+           The expected hand is: "{expected_hand}".
+           
+           - If expected is "right" but the image shows a LEFT hand:
+             Return STRICTLY:
+             {{
+                 "is_valid": false,
+                 "error_type": "wrong_hand",
+                 "detected_hand": "left",
+                 "expected_hand": "right",
+                 "general_analysis": "આ તમારી ડાબી હથેળી (Left Palm) નો ફોટો છે. કૃપા કરીને તમારી જમણી હથેળી (Right Palm) નો ફોટો અપલોડ કરો.",
+                 "heart_line": "",
+                 "head_line": "",
+                 "life_line": "",
+                 "fate_line": "",
+                 "sun_line": "",
+                 "special_symbols": ""
+             }}
+             (Ensure the general_analysis message is in {lang}: in Gujarati: "આ તમારી ડાબી હથેળી (Left Palm) નો ફોટો છે. કૃપા કરીને તમારી જમણી હથેળી (Right Palm) નો ફોટો અપલોડ કરો.", in Hindi: "यह आपकी बाईं हथेली (Left Palm) की फोटो है। कृपया अपनी दाईं हथेली (Right Palm) की फोटो अपलोड करें।", in English: "This is a photo of your Left Palm. Please provide a photo of your Right Palm.")
+
+           - If expected is "left" but the image shows a RIGHT hand:
+             Return STRICTLY:
+             {{
+                 "is_valid": false,
+                 "error_type": "wrong_hand",
+                 "detected_hand": "right",
+                 "expected_hand": "left",
+                 "general_analysis": "આ તમારી જમણી હથેળી (Right Palm) નો ફોટો છે. કૃપા કરીને તમારી ડાબી હથેળી (Left Palm) નો ફોટો અપલોડ કરો.",
+                 "heart_line": "",
+                 "head_line": "",
+                 "life_line": "",
+                 "fate_line": "",
+                 "sun_line": "",
+                 "special_symbols": ""
+             }}
+             (Ensure the general_analysis message is in {lang}: in Gujarati: "આ તમારી જમણી હથેળી (Right Palm) નો ફોટો છે. કૃપા કરીને તમારી ડાબી હથેળી (Left Palm) નો ફોટો અપલોડ કરો.", in Hindi: "यह आपकी दाईं हથેલી (Right Palm) की फोटो है। कृपया अपनी बाईं हथेली (Left Palm) की फोटो अपलोड करें।", in English: "This is a photo of your Right Palm. Please provide a photo of your Left Palm.")
+
+        STEP 2: PALM READING (ONLY IF HAND MATCHES EXPECTED "{expected_hand}"):
+        If the hand is valid and matches "{expected_hand}", provide a detailed, authentic Vedic palm reading in {lang} language.
+        Return ONLY a valid JSON object (no markdown backticks, no extra text):
+        {{
+            "is_valid": true,
+            "error_type": "",
+            "detected_hand": "{expected_hand}",
+            "expected_hand": "{expected_hand}",
+            "general_analysis": "Detailed 4-5 line summary and future forecast in {lang}.",
+            "heart_line": "Analysis of emotional life, relationships, and marriage in {lang}.",
+            "head_line": "Analysis of intellect, wisdom, and decision-making in {lang}.",
+            "life_line": "Analysis of vitality, health, and longevity in {lang}.",
+            "fate_line": "Analysis of career growth, business, and wealth in {lang}.",
+            "sun_line": "Analysis of fame, public honor, and success in {lang}.",
+            "special_symbols": "Analysis of mounts (Guru, Shani, Surya, Shukra), crosses, trident or special markings in {lang}."
+        }}
         '''
         try:
             img = Image.open(io.BytesIO(image_bytes))
@@ -230,11 +292,16 @@ class AIAstrologerService:
             text = response.text.strip()
             text = re.sub(r'^```json\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
-            return json.loads(text)
+            data = json.loads(text)
+            if "is_valid" not in data:
+                data["is_valid"] = True
+            return data
         except Exception as e:
             print(f'Error in analyze_palm_image: {e}')
             return {
-                "general_analysis": "Palm reading could not be processed completely. Please try again.",
+                "is_valid": False,
+                "error_type": "error",
+                "general_analysis": "હથેળીનું એનાલિસિસ થઈ શક્યું નથી. કૃપા કરીને ફરીથી સ્પષ્ટ ફોટો પાડો.",
                 "heart_line": "",
                 "head_line": "",
                 "life_line": "",
