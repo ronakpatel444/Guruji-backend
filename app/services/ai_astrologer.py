@@ -318,24 +318,47 @@ class AIAstrologerService:
         import io
         
         prompt = f'''
-        You are an expert Face Reader (Physiognomist). First, check if the provided image is actually a human face.
-        If it is NOT a human face (e.g., a car, animal, random object, or back of head), return this EXACT JSON:
-        {{
-            "general_analysis": "ક્ષમા કરજો, આ ફોટો ચહેરાનો લાગતો નથી. કૃપા કરીને સ્પષ્ટ ચહેરાનો ફોટો અપલોડ કરો.",
-            "forehead": "",
-            "eyes": "",
-            "nose": "",
-            "lips_jaw": ""
-        }}
+        You are an expert Vedic Face Reader (મુખ સમુદ્રિક શાસ્ત્ર - Physiognomy) and Computer Vision AI.
         
-        If it IS a human face, analyze the provided image of a human face.
-        Provide a detailed reading in {lang} language.
-        Return ONLY a JSON object (do not wrap in markdown or backticks) with exactly these keys:
-        - "general_analysis": A paragraph (4-5 lines) giving an overall summary of their personality and destiny.
-        - "forehead": Analysis of their intellect, youth, and wisdom.
-        - "eyes": Analysis of their emotional nature and intuition.
-        - "nose": Analysis of their career, wealth, and drive.
-        - "lips_jaw": Analysis of their communication skills, relationships, and willpower.
+        STEP 1: STRICT HUMAN FACE VALIDATION:
+        Examine the image carefully:
+        1. Check if the image contains a REAL, LIVING HUMAN FACE clearly visible.
+        2. If the image is:
+           - An animal (such as a dog, cat, cow, monkey, bird, pet, etc.)
+           - A cartoon, anime, drawing, painting, avatar, or emoji
+           - A statue, mannequin, doll, robot, or mask
+           - A random object, food, vehicle, screenshot, or scenery
+           - Extremely blurry, dark, obscured, or not showing human facial features (eyes, nose, mouth)
+           
+           You MUST REJECT IT and return STRICTLY this JSON (no markdown backticks, no other text):
+           {{
+               "is_valid": false,
+               "error_type": "not_human_face",
+               "general_analysis": "ક્ષમા કરજો, આ ફોટો અસલી માનવ ચહેરાનો લાગતો નથી. કૂતરા, બિલાડી જેવા પ્રાણીઓ કે કાર્ટૂન માન્ય નથી. કૃપા કરીને વ્યક્તિના ચહેરાનો સ્પષ્ટ ફોટો અપલોડ કરો.",
+               "forehead": "",
+               "eyes": "",
+               "nose": "",
+               "lips_jaw": ""
+           }}
+           (Translate the general_analysis message to {lang}:
+            - In Gujarati: "ક્ષમા કરજો, આ ફોટો અસલી માનવ ચહેરાનો લાગતો નથી. કૂતરા, બિલાડી જેવા પ્રાણીઓ કે કાર્ટૂન માન્ય નથી. કૃપા કરીને તમારા ચહેરાનો સ્પષ્ટ ફોટો અપલોડ કરો."
+            - In Hindi: "क्षमा करें, यह फोटो असली मानव चेहरे का नहीं है। कुत्ते, बिल्ली जैसे जानवर या कार्टून मान्य नहीं हैं। कृपया अपने चेहरे का स्पष्ट फोटो अपलोड करें।"
+            - In English: "Sorry, this image is not a real human face. Animals (dog, cat, etc.) or cartoons are not accepted. Please upload a clear photo of a human face."
+           )
+
+        STEP 2: AUTHENTIC VEDIC FACE READING (ONLY IF REAL HUMAN FACE):
+        If and ONLY if a genuine human face is clearly detected:
+        Provide a detailed, respectful, and authentic Vedic face reading in {lang} language.
+        Return ONLY a valid JSON object:
+        {{
+            "is_valid": true,
+            "error_type": "",
+            "general_analysis": "A detailed 4-5 line summary of their destiny, personality traits, and overall fortune in {lang}.",
+            "forehead": "Analysis of intellect, youth, wisdom, and thinking style in {lang}.",
+            "eyes": "Analysis of emotional depth, perception, sincerity, and intuition in {lang}.",
+            "nose": "Analysis of wealth accumulation, career drive, ambition, and confidence in {lang}.",
+            "lips_jaw": "Analysis of willpower, communication skills, relationships, and determination in {lang}."
+        }}
         '''
         try:
             img = Image.open(io.BytesIO(image_bytes))
@@ -343,13 +366,18 @@ class AIAstrologerService:
             text = response.text.strip()
             text = re.sub(r'^```json\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
-            return json.loads(text)
+            data = json.loads(text)
+            if "is_valid" not in data:
+                data["is_valid"] = True
+            return data
         except Exception as e:
             print(f'Error in analyze_face_image: {e}')
             return {
-                "general_analysis": "Face reading could not be processed completely. Please try again.",
-                "forehead": "Data unavailable",
-                "eyes": "Data unavailable",
-                "nose": "Data unavailable",
-                "lips_jaw": "Data unavailable"
+                "is_valid": False,
+                "error_type": "error",
+                "general_analysis": "ચહેરાનું એનાલિસિસ થઈ શક્યું નથી. કૃપા કરીને ફરીથી સ્પષ્ટ ફોટો પાડો.",
+                "forehead": "",
+                "eyes": "",
+                "nose": "",
+                "lips_jaw": ""
             }
